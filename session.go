@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"container/list"
 	"net"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/alvin921/glog"
+	"github.com/alvinwsz/glog"
 )
 
 var dialSessionId uint64
@@ -158,14 +159,23 @@ func (session *Session) sendBuffer(buffer *OutBuffer) error {
 	return session.iPacket.write(session.conn, buffer)
 }
 
-type IPacketProc interface {
-	Handle(data []byte, session *Session) error
-}
-
-// Process one request.
-func (session *Session) ProcessOnce(handler IPacketProc) error {
+// get one package decoded with JSON
+func (session *Session) Get(tag string, c interface{}) error {
 	session.readMutex.Lock()
 	defer session.readMutex.Unlock()
+
+	var decoder Decoder
+	tag = strings.ToLower(tag)
+	switch tag {
+	case "json":
+		decoder = JsonDecoder(c)
+	case "gob":
+		decoder = GobDecoder(c)
+	case "xml":
+		decoder = XmlDecoder(c)
+	default:
+		panic("unknow packet type")
+	}
 
 	buffer := newInBuffer()
 	err := session.iPacket.read(session.conn, buffer)
@@ -174,19 +184,55 @@ func (session *Session) ProcessOnce(handler IPacketProc) error {
 		session.Close()
 		return err
 	}
-
-	err = handler.Handle(buffer.Data, session)
+	err = decoder(buffer)
+	//err = json.Unmarshal(buffer.Data, c)
+	if err != nil {
+		glog.Error("error:", err)
+	}
 	buffer.free()
 
 	return err
 }
 
+type PacketHandler func(data []byte) error
+
+// Process one request.
+func (session *Session) ProcessOnce(handler PacketHandler) error {
+	session.readMutex.Lock()
+	defer session.readMutex.Unlock()
+
+	buffer := newInBuffer()
+	defer buffer.free()
+
+	err := session.iPacket.read(session.conn, buffer)
+	if err != nil {
+		session.Close()
+		return err
+	}
+
+	err = handler(buffer.Data)
+
+	return err
+}
+
+type IPacketProc interface {
+	Handle(data []byte, session *Session) error
+}
+
 // Process request.
 func (session *Session) Process(handler IPacketProc) error {
 	for {
-		if err := session.ProcessOnce(handler); err != nil {
+		buffer := newInBuffer()
+		session.readMutex.Lock()
+		err := session.iPacket.read(session.conn, buffer)
+		session.readMutex.Unlock()
+		if err != nil {
+			buffer.free()
+			session.Close()
 			return err
 		}
+		err = handler.Handle(buffer.Data, session)
+		buffer.free()
 	}
 	return nil
 }

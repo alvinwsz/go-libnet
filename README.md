@@ -88,20 +88,27 @@ if err == nil {
 
 
 
-- ProcessOnce/Process
+- ProcessOnce
 
 原型如下：
+
+
+```golang
+type PacketHandler func(data []byte) error
+func (session *Session)ProcessOnce(handler PacketHandler) error
+```
+
+ProcessOnce阻塞方式读取并处理一个packet
+
+- Process
 
 
 ```golang
 type IPacketProc interface {
 	Handle(data []byte, session *Session) error
 }
-func (session *Session)ProcessOnce(handler IPacketProc) error
 func (session *Session)Process(handler IPacketProc) error
 ```
-
-ProcessOnce阻塞方式读取并处理一个packet
 
 Process阻塞方式读取并处理packet
 
@@ -133,14 +140,15 @@ session.HeartBeat(0, nil)
 import "github.com/alvin921/go-libnet"
 
 func (p *libnet.Session) Handle(data []byte, session *Session) error {
-  if string(data) != "hello" {
-    return errors.New("echo failed")
-  }
-  return nil
 }
 client, err := libnet.Dial("tcp", "127.0.0.1:8888")
 client.Send(libnet.String("hello"))
-client.ProcessOnce(client)
+client.ProcessOnce(func(data []byte) error {
+  if string(data) != "hello" {
+    return errors.New("echo failed")
+  }
+  return nil  
+})
 
 client.Close()
 ```
@@ -152,24 +160,20 @@ client.Close()
 Server是对net.Listener的封装，提供更高级别更简易的操作
 
 ```golang
-Listen(network, address string) (*Server, error)
+ListenAndServe(network, address string, handler IPacketProc) (*Server, error)
 ```
 
-比如：
+阻塞accept客户端连接，然后为每个连接创建goroutine进行处理，用户自定义协议处理`IPacketProc`，原型如下
 
 ```golang
-server, err := libnet.Listen("tcp", "192.168.1.100:8888")
+type IPacketProc interface {
+	Handle(data []byte, session *Session) error
+}
 ```
 
-接口很简单，只有如下三个
 
-- Serve
 
-```golang
-func (server *Server)Serve(handler IPacketProc) error
-```
-
-阻塞accept客户端连接，然后为每个连接创建goroutine进行处理，用户自定义协议处理`IPacketProc`
+接口很简单，只有如下两个
 
 - Broadcast
 
@@ -215,12 +219,14 @@ func (server *Server)Stop()
 
 ```golang
 import "github.com/alvin921/go-libnet"
-
+type EchoServer struct {
+  server *libnet.Server
+}
 func (p *libnet.Server) Handle(data []byte, session *Session) error {
   return session.Send(libnet.Bytes(data))
 }
-server, err := libnet.Listen("tcp", "127.0.0.1:8888")
-server.Serve(server)
+echoServer := &EchoServer{}
+echoServer.server, err := libnet.ListenAndServe("tcp", "127.0.0.1:8888", echoServer)
 ```
 
 

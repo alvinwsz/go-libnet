@@ -87,3 +87,23 @@ func (session *Session) Xml(v interface{}) Encoder {
 		return xml.NewEncoder(buffer).Encode(v)
 	}
 }
+
+//==============================================
+// Decoder
+func JsonDecoder(v interface{}) Decoder {
+	return func(buffer *InBuffer) error {
+		return json.NewDecoder(buffer).Decode(v)
+	}
+}
+
+func GobDecoder(v interface{}) Decoder {
+	return func(buffer *InBuffer) error {
+		return gob.NewDecoder(buffer).Decode(v)
+	}
+}
+
+func XmlDecoder(v interface{}) Decoder {
+	return func(buffer *InBuffer) error {
+		return xml.NewDecoder(buffer).Decode(v)
+	}
+}

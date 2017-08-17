@@ -3,6 +3,8 @@ package libnet
 import (
 	"encoding/binary"
 	"io"
+
+	"github.com/alvinwsz/glog"
 )
 
 type ByteOrder binary.ByteOrder
@@ -82,6 +84,8 @@ func (p *packetWrapper) write(writer io.Writer, packet *OutBuffer) error {
 	if p.MaxPacketSize > 0 && len(packet.Data) > p.MaxPacketSize {
 		return PacketTooLargeError
 	}
+	glog.Info("packetWrapper.write:", len(packet.Data))
+	glog.Info(packet.Data)
 	p.encodeHead(packet.Data)
 	if _, err := writer.Write(packet.Data); err != nil {
 		return err

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/alvin921/glog"
+	"github.com/alvinwsz/glog"
 )
 
 // Errors
@@ -22,15 +22,6 @@ var (
 	DefaultSendChanSize   = 1024 // Default session send chan buffer size.
 	DefaultConnBufferSize = 1024 // Default session read buffer size.
 )
-
-// The easy way to setup a server.
-func Listen(network, address string) (*Server, error) {
-	listener, err := net.Listen(network, address)
-	if err != nil {
-		return nil, err
-	}
-	return newServer(listener, iPacket), nil
-}
 
 // Server.
 type Server struct {
@@ -94,8 +85,13 @@ func (server *Server) accept() (*Session, error) {
 	), nil
 }
 
+type IServerProc interface {
+	OnAccept(session *Session) error
+	Handle(data []byte, session *Session) error
+}
+
 // Loop and accept incoming connections. The callback will called asynchronously when each session start.
-func (server *Server) Serve(handler IPacketProc) error {
+func (server *Server) serve(handler IServerProc) error {
 	for {
 		session, err := server.accept()
 		if err != nil {
@@ -111,9 +107,28 @@ func (server *Server) Serve(handler IPacketProc) error {
 			server.Stop()
 			return err
 		}
+		err = handler.OnAccept(session)
+		if err != nil {
+			continue
+		}
 		go session.Process(handler)
 	}
 	return nil
+}
+
+// The easy way to setup a server.
+func ListenAndServe(network, address string, handler IServerProc) (*Server, error) {
+	listener, err := net.Listen(network, address)
+	if err != nil {
+		return nil, err
+	}
+	server := newServer(listener, iPacket)
+	server.stopWait.Add(1)
+	go func() {
+		server.serve(handler)
+		server.stopWait.Done()
+	}()
+	return server, nil
 }
 
 // Stop server.
