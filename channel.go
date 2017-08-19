@@ -1,6 +1,10 @@
 package libnet
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/alvinwsz/glog"
+)
 
 // The channel type. Used to maintain a group of session.
 // Normally used for broadcast classify purpose.
@@ -54,11 +58,13 @@ func (channel *Channel) Join(session *Session, kickCallback func()) {
 
 // Exit the channel.
 func (channel *Channel) Exit(session *Session) {
+	//glog.Info(">>>>>>channel exit:", session)
 	channel.Lock()
 	defer channel.Unlock()
 
 	session.RemoveCloseCallback(channel)
 	delete(channel.sessions, session.Id())
+	//glog.Info("<<<<<<<channel exit")
 }
 
 // Kick out a session from the channel.

@@ -4,6 +4,8 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"encoding/xml"
+
+	"github.com/alvinwsz/glog"
 )
 
 // Convert to bytes message.
@@ -25,7 +27,10 @@ func String(v string) Encoder {
 // Create a json message.
 func Json(v interface{}) Encoder {
 	return func(buffer *OutBuffer) error {
-		return json.NewEncoder(buffer).Encode(v)
+		//glog.Info("before: ", v);
+		err := json.NewEncoder(buffer).Encode(v)
+		glog.Info(">>>>>>TX(Json): ", string(buffer.Data))
+		return err
 	}
 }
 

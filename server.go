@@ -160,12 +160,13 @@ func (server *Server) putSession(session *Session) {
 
 // Delete a session from session list.
 func (server *Server) delSession(session *Session) {
+	//glog.Info(">>>>>>>>>delSession: ", session);
 	server.sessionMutex.Lock()
-	defer server.sessionMutex.Unlock()
-
 	session.RemoveCloseCallback(server)
 	delete(server.sessions, session.id)
 	server.stopWait.Done()
+	server.sessionMutex.Unlock()
+	//glog.Info("<<<<<<<<delSession");
 }
 
 // Copy sessions for close.

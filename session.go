@@ -126,7 +126,6 @@ func (session *Session) IsClosed() bool {
 func (session *Session) Close() {
 	if atomic.CompareAndSwapInt32(&session.closeFlag, 0, 1) {
 		session.conn.Close()
-
 		// exit send loop and cancel async send
 		close(session.closeChan)
 
@@ -340,6 +339,7 @@ func (session *Session) AddCloseCallback(handler interface{}, callback func()) {
 // Remove close callback.
 func (session *Session) RemoveCloseCallback(handler interface{}) {
 	if session.IsClosed() {
+		//	TO avoid DEAD LOCK via invokeCloseCallbacks()
 		return
 	}
 
@@ -363,6 +363,7 @@ func (session *Session) invokeCloseCallbacks() {
 		callback := i.Value.(closeCallback)
 		callback.Func()
 	}
+
 }
 
 // if timeout == 0, just stop heartbeat
